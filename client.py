@@ -2,19 +2,15 @@ import socket
 import cv2
 import pickle
 import struct
-import numpy as np
 from tkinter import *
 from PIL import Image, ImageTk
 import threading
-import protocol
 
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
 
 host = '127.0.0.1'  # Replace with the server's IP
 port = 9999
 client_socket.connect((host, port))
-
 
 data = b""
 payload_size = struct.calcsize("Q")
@@ -31,6 +27,9 @@ root.title("Video Stream")
 label = Label(root)
 label.grid(row=0, column=0, sticky=W, pady=2)
 
+label2 = Label(root)
+label2.grid(row=1, column=0, sticky=W, pady=2)
+
 l1 = Button(root, text="Close", command=close_connection)
 l2 = Label(root, text="Second:")
 
@@ -41,8 +40,8 @@ l2.grid(row=2, column=0, sticky=W, pady=2)
 def send_video():
     vid = cv2.VideoCapture(0)  # 0 for the default camera
 
-    vid.set(3, 800)
-    vid.set(4, 600)
+    vid.set(3, 400)
+    vid.set(4, 300)
 
     while True:
         if vid.isOpened():
@@ -56,6 +55,9 @@ def update_frame():
     while True:
         global data
         global label
+
+        index = client_socket.recv(1)
+
         while len(data) < payload_size:
             packet = client_socket.recv(4 * 1024)  # Adjust the buffer size as needed
             if not packet:
@@ -72,16 +74,22 @@ def update_frame():
         data = data[msg_size:]
         frm = pickle.loads(frame_data)
 
-        update_GUI_frame(frm)
+        update_GUI_frame(frm, index)
 
-def update_GUI_frame(frm):
+
+def update_GUI_frame(frm, index):
     # GUI
     frm = cv2.cvtColor(frm, cv2.COLOR_BGR2RGB)
     frm = Image.fromarray(frm)
     frm = ImageTk.PhotoImage(image=frm)
 
-    label.config(image=frm)
-    label.image = frm
+    if index == 0:
+        label.config(image=frm)
+        label.image = frm
+    if index == 1:
+        label2.config(image=frm)
+        label2.image = frm
+
     root.update()
 
 

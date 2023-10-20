@@ -1,6 +1,4 @@
 import threading
-
-import cv2
 import socket
 import pickle
 import struct
@@ -11,33 +9,33 @@ host = '0.0.0.0'  # Use 0.0.0.0 to accept connections from any IP
 port = 9999
 socket_address = (host, port)
 
-# Bind the socket to the address
 server_socket.bind(socket_address)
 
-# Listen for incoming connections
 server_socket.listen(5)
 print("Listening at", socket_address)
 
-data = b""
+clients = []
+data = [b""]
+
 payload_size = struct.calcsize("Q")
 
 
-def update_frame(client_socket):
+def update_frame(client_socket, index):
     global data
-    while len(data) < payload_size:
-        packet = client_socket.recv(4 * 1024)  # Adjust the buffer size as needed
+    while len(data[index]) < payload_size:
+        packet = client_socket.recv(16 * 1024)  # Adjust the buffer size as needed
         if not packet:
             break
-        data += packet
-    packed_msg_size = data[:payload_size]
-    data = data[payload_size:]
+        data[index] += packet
+    packed_msg_size = data[index][:payload_size]
+    data[index] = data[index][payload_size:]
     msg_size = struct.unpack("Q", packed_msg_size)[0]
 
-    while len(data) < msg_size:
-        data += client_socket.recv(4 * 1024)  # Adjust the buffer size as needed
+    while len(data[index]) < msg_size:
+        data[index] += client_socket.recv(16 * 1024)  # Adjust the buffer size as needed
 
-    frame_data = data[:msg_size]
-    data = data[msg_size:]
+    frame_data = data[index][:msg_size]
+    data[index] = data[index][msg_size:]
     frm = pickle.loads(frame_data)
     return frm
 
@@ -46,18 +44,22 @@ def accept_connections():
     while True:
         client_socket, addr = server_socket.accept()
 
-        #if client_socket:
-        print('GOT CONNECTION FROM:', addr)
-        threading.Thread(target=client_handler, args=(client_socket,)).start()
+        # if client_socket:
+        print("GOT CONNECTION FROM: " + str(addr[0]) + ":" + str(addr[1]) + "\nindex = " + str(len(clients)) + "\n")
+        threading.Thread(target=client_handler, args=(client_socket, 0, len(clients))).start()
+        clients.append(addr)
+        data.append(b"")
 
 
-def client_handler(connection):
+def client_handler(connection, type, index):
     while True:
-        frame = update_frame(connection)
+        for i in range(0, len(clients)):
+            frame = update_frame(connection, i)
 
-        a = pickle.dumps(frame)
-        message = struct.pack("Q", len(a)) + a
-        connection.sendall(message)
+            a = pickle.dumps(frame)
+            message = struct.pack("Q", len(a)) + a
+            connection.send(i)
+            connection.sendall(message)
 
 
 accept_connections()
