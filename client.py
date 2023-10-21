@@ -14,6 +14,7 @@ client_socket.connect((host, port))
 
 data = b""
 payload_size = struct.calcsize("Q")
+index_size = struct.calcsize("I")
 
 
 def close_connection():
@@ -56,7 +57,16 @@ def update_frame():
         global data
         global label
 
-        index = client_socket.recv(1)
+        while len(data) < index_size:
+            packet = client_socket.recv(4 * 1024)  # Adjust the buffer size as needed
+            if not packet:
+                break
+            data += packet
+        packed_index = data[:index_size]
+        data = data[index_size:]
+        index = struct.unpack("I", packed_index)[0]
+
+        print(index)
 
         while len(data) < payload_size:
             packet = client_socket.recv(4 * 1024)  # Adjust the buffer size as needed

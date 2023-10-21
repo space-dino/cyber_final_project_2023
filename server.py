@@ -54,11 +54,10 @@ def accept_connections():
 def client_handler(connection, type, index):
     while True:
         for i in range(0, len(clients)):
+            print("i " + str(i))
             frame = update_frame(connection, i)
-
             a = pickle.dumps(frame)
-            message = struct.pack("Q", len(a)) + a
-            connection.send(i)
+            message = struct.pack("I", i) + struct.pack("Q", len(a)) + a
             connection.sendall(message)
 
 
