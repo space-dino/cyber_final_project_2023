@@ -19,7 +19,10 @@ labels = []
 
 def send():
     while True:
-        client_socket.send(str(8).encode())
+        for i in range(0, 1023):
+            client_socket.send(str(66666666).encode())
+        for i in range(0, 1023):
+            client_socket.send(str(77777777).encode())
 
 
 def receive():
