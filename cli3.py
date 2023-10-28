@@ -40,21 +40,21 @@ data = b''
 def send():
     vid = cv2.VideoCapture(0)  # 0 for the default camera
 
-    vid.set(3, 400)
-    vid.set(4, 300)
+    vid.set(3, 100)
+    vid.set(4, 75)
 
     while True:
         img, frame = vid.read()
-        protocol.send_video_frame(client_socket, frame)
+        protocol.send_frame(client_socket, frame, 0)
 
 
 def receive():
     global data
     while True:
-        frame, data = protocol.receive_video_frame(client_socket, data)
+        frame, data, index = protocol.receive_frame(client_socket, data)
 
         if bytes(frame) != b'':
-            draw_GUI_frame(frame, 0)
+            draw_GUI_frame(frame, index)
 
 
 def draw_GUI_frame(frame, index):

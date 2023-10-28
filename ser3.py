@@ -30,20 +30,20 @@ def accept_connections():
         frames.append(b'')
         data.append(b'')
 
-        Thread(target=send_to_client, args=(client_socket,)).start()
+        Thread(target=send_to_client, args=(client_socket, len(clients) - 1)).start()
         Thread(target=receive_from_client, args=(client_socket,)).start()
 
 
-def send_to_client(connection):
+def send_to_client(connection, index):
     global frames
     while True:
-        protocol.send_video_frame(connection, frames[0])
+        protocol.send_frame(connection, frames[0], index)
 
 
 def receive_from_client(connection):
     global frames, data
     while True:
-        frames[0], data[0] = protocol.receive_video_frame(connection, data[0])
+        frames[0], data[0], index = protocol.receive_frame(connection, data[0])
 
 
 accept_connections()
