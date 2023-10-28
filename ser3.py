@@ -31,19 +31,20 @@ def accept_connections():
         data.append(b'')
 
         Thread(target=send_to_client, args=(client_socket, len(clients) - 1)).start()
-        Thread(target=receive_from_client, args=(client_socket,)).start()
+        Thread(target=receive_from_client, args=(client_socket, len(clients) - 1)).start()
 
 
 def send_to_client(connection, index):
     global frames
     while True:
-        protocol.send_frame(connection, frames[0], index)
+        for i in range(0, len(clients)):
+            protocol.send_frame(connection, frames[i], i)
 
 
-def receive_from_client(connection):
+def receive_from_client(connection, index):
     global frames, data
     while True:
-        frames[0], data[0], index = protocol.receive_frame(connection, data[0])
+        frames[index], data[index], ind = protocol.receive_frame(connection, data[index])
 
 
 accept_connections()

@@ -63,7 +63,7 @@ def draw_GUI_frame(frame, index):
     frame = Image.fromarray(frame)
     frame = ImageTk.PhotoImage(image=frame)
 
-    if index >= len(labels):
+    while index >= len(labels):
         label = tk.Label(root)
         labels.append(label)
 
