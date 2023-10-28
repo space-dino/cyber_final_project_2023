@@ -58,7 +58,7 @@ def update_frame():
         global label
 
         while len(data) < index_size:
-            packet = client_socket.recv(4 * 1024)  # Adjust the buffer size as needed
+            packet = client_socket.recv(8)  # Adjust the buffer size as needed
             if not packet:
                 break
             data += packet
@@ -66,7 +66,7 @@ def update_frame():
         data = data[index_size:]
         index = struct.unpack("I", packed_index)[0]
 
-        print(index)
+        # print(index)
 
         while len(data) < payload_size:
             packet = client_socket.recv(4 * 1024)  # Adjust the buffer size as needed
@@ -82,9 +82,13 @@ def update_frame():
 
         frame_data = data[:msg_size]
         data = data[msg_size:]
-        frm = pickle.loads(frame_data)
 
-        update_GUI_frame(frm, index)
+        # print(frame_data)
+
+        if frame_data != b'':
+            frm = pickle.loads(frame_data)
+
+            update_GUI_frame(frm, index)
 
 
 def update_GUI_frame(frm, index):
