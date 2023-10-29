@@ -14,6 +14,7 @@ port = 9999
 client_socket.connect((host, port))
 print("Connected to server")
 
+
 # </editor-fold>
 
 
@@ -35,6 +36,7 @@ labels = []
 # </editor-fold>
 
 data = b''
+my_index = 6
 
 
 def send():
@@ -45,16 +47,19 @@ def send():
 
     while True:
         img, frame = vid.read()
-        protocol.send_frame(client_socket, frame, 0)
+
+        # indexes here dont matter becuase server isnt reading them
+        protocol.send_frame(client_socket, frame, 0, 0)
+        draw_GUI_frame(frame, my_index)
 
 
 def receive():
-    global data
+    global data, my_index
     while True:
-        frame, data, index = protocol.receive_frame(client_socket, data)
+        frame, data, index, my_index = protocol.receive_frame(client_socket, data)
 
-        if bytes(frame) != b'':
-            draw_GUI_frame(frame, index)
+        if bytes(frame) != b'' and index != my_index:
+            draw_GUI_frame(frame, int(index))
 
 
 def draw_GUI_frame(frame, index):
@@ -77,6 +82,5 @@ def draw_GUI_frame(frame, index):
 
 Thread(target=receive).start()
 Thread(target=send).start()
-
 
 root.mainloop()
