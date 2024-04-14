@@ -5,19 +5,27 @@ import protocol4
 
 # <editor-fold desc="Socket Setup">
 
-server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-host = '0.0.0.0'
-port = 9999
-socket_address = (host, port)
-server_socket.bind(socket_address)
+vid_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+aud_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-server_socket.listen()
+host = '0.0.0.0'
+port = 9997
+vid_socket_address = (host, port)
+aud_socket_address = (host, port + 1)
+
+vid_server_socket.bind(vid_socket_address)
+aud_server_socket.bind(aud_socket_address)
+
+vid_server_socket.listen()
+aud_server_socket.listen()
+
 print(socket.gethostname())
-print("Listening at", socket_address)
+print("Listening video at", vid_socket_address, "audio at", aud_socket_address)
 
 # </editor-fold>
 
-clients = []
+vid_clients = []
+aud_clients = []
 
 
 class connection:
@@ -28,12 +36,12 @@ class connection:
         self.index = index
 
 
-def accept_connections():
+def accept_connections(soc: socket, lis):
     while True:
-        client_socket, addr = server_socket.accept()
-        cli_index = len(clients)
+        client_socket, addr = soc.accept()
+        cli_index = len(lis)
         con = connection(client_socket, cli_index)
-        clients.append(con)
+        lis.append(con)
         print("GOT CONNECTION FROM: " + str(addr[0]) + ":" + str(addr[1]) + "\nindex = " + str(cli_index) + "\n")
 
         print_clients()
@@ -46,7 +54,7 @@ def send_to_client(con: connection):
     b = True
 
     while b:
-        for i in range(len(clients)):
+        for i in range(len(vid_clients)):
             try:
                 protocol4.send_frame(con.soc, con.frame, 0, i, con.index)
             except ConnectionResetError:
@@ -63,25 +71,27 @@ def receive_from_client(con: connection):
                 con.frame = a
 
         except ConnectionResetError:
-            remove_client(con)
+            remove_client(con, vid_clients)
+            remove_client(con, aud_clients)
 
 
-def remove_client(con: connection):
-    for i in clients:
+def remove_client(con: connection, lis):
+    for i in lis:
         if i.index == con.index:
             print("removing " + str(i))
-            clients.remove(i)
+            lis.remove(i)
 
-            for o in range(0, len(clients)):
-                if clients[o] is None:
-                    if o < len(clients) - 1:
-                        clients[o].index = clients[o].index - 1
+            for o in range(0, len(lis)):
+                if lis[o] is None:
+                    if o < len(lis) - 1:
+                        lis[o].index = lis[o].index - 1
     print_clients()
 
 
 def print_clients():
-    for i in clients:
+    for i in vid_clients:
         print(i.index)
 
 
-accept_connections()
+Thread(target=accept_connections, args=(vid_server_socket, vid_clients,)).start()
+Thread(target=accept_connections, args=(aud_server_socket, aud_clients,)).start()
