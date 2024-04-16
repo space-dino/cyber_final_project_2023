@@ -9,9 +9,19 @@ import pyaudio
 
 class client:
     def __init__(self):
-        # <editor-fold desc="Socket Setup">
+
+        self.in_stream = None
+        self.out_stream = None
+        self.FORMAT = pyaudio.paInt16
+        self.CHANNELS = 1
+        self.RATE = 44100
+        self.A_CHUNK = 1024
+        self.audio = pyaudio.PyAudio()
 
         self.vid = None
+
+        # <editor-fold desc="Socket Setup">
+
         print("Client up")
         self.video_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.audio_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -21,22 +31,6 @@ class client:
         self.video_socket.connect((self.host, self.port))
         self.audio_socket.connect((self.host, self.port + 1))
         print("Connected to server")
-
-        # </editor-fold>
-
-        # <editor-fold desc="Audio Settings">
-
-        FORMAT = pyaudio.paInt16
-        CHANNELS = 1
-        RATE = 44100
-        self.A_CHUNK = 1024
-
-        self.audio = pyaudio.PyAudio()
-
-        # Open a stream to capture audio
-        self.stream = self.audio.open(format=FORMAT, channels=CHANNELS,
-                                      rate=RATE, input=True,
-                                      frames_per_buffer=self.A_CHUNK)
 
         # </editor-fold>
 
@@ -56,10 +50,8 @@ class client:
         self.entry = tk.Entry(self.window)
         self.entry.pack()
 
-        self.submit_button = tk.Button(self.window, text="Submit", command=self.submit)
+        self.submit_button = tk.Button(self.window, text="Join Meeting", command=self.submit)
         self.submit_button.pack()
-
-
 
         self.close_button = tk.Button(self.root, text="Close", command=self.close_connection)
         self.close_button.grid(row=0, column=1)
@@ -76,7 +68,9 @@ class client:
 
         # </editor-fold>
 
-        self.data = b''
+        self.vid_data = b''
+        self.aud_data = b''
+
         self.my_index = 6
 
         self.up = True
@@ -91,8 +85,11 @@ class client:
         self.start()
 
     def close_connection(self):
-        self.stream.stop_stream()
-        self.stream.close()
+        self.in_stream.stop_stream()
+        self.in_stream.close()
+        self.out_stream.stop_stream()
+        self.out_stream.close()
+
         self.audio.terminate()
 
         self.up = False
@@ -102,8 +99,7 @@ class client:
         self.audio_socket.close()
         self.root.destroy()
 
-    def send(self):
-        # Video
+    def send_vid(self):
         self.vid = cv2.VideoCapture(0)  # 0 for the default camera
         fps = self.vid.get(cv2.CAP_PROP_FPS)
 
@@ -114,27 +110,45 @@ class client:
             img, unflipped = self.vid.read()
             vid_frame = cv2.flip(unflipped, 1)
 
-            aud_frame = self.stream.read(self.A_CHUNK)
-
             # indexes here dont matter becuase server isnt reading them. flag does matter! ********* flags obsolete
             protocol4.send_frame(self.video_socket, vid_frame, 0, 0, 0)  # video
             self.draw_GUI_frame(vid_frame, self.my_index, fps)
 
-            protocol4.send_frame(self.audio_socket, aud_frame, 1, 0, 0)  # audio
-
-    def receive(self):
-        # audio_put, context = ps.audioCapture(mode='send')
-
+    def receive_vid(self):
         while self.up:
-            vid_frame, self.data, index, self.my_index = protocol4.receive_frame(self.video_socket, self.data)
+            vid_frame, self.vid_data, index, self.my_index = protocol4.receive_frame(self.video_socket, self.vid_data)
 
             if bytes(vid_frame) != b'' and index != self.my_index:
                 self.draw_GUI_frame(vid_frame, int(index))
 
-            aud_frame, self.data, index, self.my_index = protocol4.receive_frame(self.video_socket, self.data)
+    def send_aud(self):
+        # <editor-fold desc="Audio Settings">
 
-            if bytes(aud_frame) != b'' and index != self.my_index:
-                self.stream.write(aud_frame)
+        # Open a stream to capture audio
+
+        self.in_stream = self.audio.open(format=self.FORMAT, channels=self.CHANNELS,
+                                         rate=self.RATE, input=True,
+                                         frames_per_buffer=self.A_CHUNK)
+
+        # </editor-fold>
+
+        while self.up:
+            aud_frame = self.in_stream.read(self.A_CHUNK)
+
+            protocol4.send_frame(self.audio_socket, aud_frame, 1, 0, 0)  # audio
+            # self.out_stream.write(aud_frame)
+
+    def receive_aud(self):
+        self.out_stream = self.audio.open(format=self.FORMAT, channels=self.CHANNELS,
+                                          rate=self.RATE, output=True,
+                                          frames_per_buffer=self.A_CHUNK)
+
+        while self.up:
+            aud_frame, self.aud_data, index, self.my_index = protocol4.receive_frame(self.audio_socket, self.aud_data)
+            print(aud_frame)
+            # if bytes(aud_frame) != b'' and index != self.my_index:
+            if bytes(aud_frame) != b'':
+                self.out_stream.write(aud_frame)
 
     def draw_GUI_frame(self, frame, index, fps):
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -156,10 +170,13 @@ class client:
         self.root.update()
 
     def start(self):
-        Thread(target=self.receive).start()
-        Thread(target=self.send).start()
+        Thread(target=self.send_vid).start()
+        Thread(target=self.send_aud).start()
+        Thread(target=self.receive_vid).start()
+        Thread(target=self.receive_aud).start()
 
     def mainloop(self):
         self.root.mainloop()
+
 
 client()

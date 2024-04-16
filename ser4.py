@@ -42,9 +42,13 @@ def accept_connections(soc: socket, lis):
         cli_index = len(lis)
         con = connection(client_socket, cli_index)
         lis.append(con)
-        print("GOT CONNECTION FROM: " + str(addr[0]) + ":" + str(addr[1]) + "\nindex = " + str(cli_index) + "\n")
 
-        print_clients()
+        if lis == vid_clients:
+            print("GOT VIDEO CONNECTION FROM:\n(" + str(addr[0]) + ":" + str(addr[1]) + ") " + str(cli_index) + "\n")
+        if lis == aud_clients:
+            print("GOT AUDIO CONNECTION FROM:\n(" + str(addr[0]) + ":" + str(addr[1]) + ") " + str(cli_index) + "\n")
+
+        # print_clients()
 
         Thread(target=send_to_client, args=(con,)).start()
         Thread(target=receive_from_client, args=(con,)).start()
@@ -65,10 +69,7 @@ def receive_from_client(con: connection):
     while True:
         try:
             # indexes here are obsolete and passed as a null value
-            a, con.data, flag, *_ = protocol4.receive_frame(con.soc, con.data)
-
-            if flag == 0:
-                con.frame = a
+            con.frame, con.data, *_ = protocol4.receive_frame(con.soc, con.data)
 
         except ConnectionResetError:
             remove_client(con, vid_clients)
@@ -85,7 +86,7 @@ def remove_client(con: connection, lis):
                 if lis[o] is None:
                     if o < len(lis) - 1:
                         lis[o].index = lis[o].index - 1
-    print_clients()
+    # print_clients()
 
 
 def print_clients():
