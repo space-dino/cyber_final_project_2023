@@ -1,7 +1,9 @@
 import socket
-import struct
 from threading import Thread
 import protocol4
+import pyaudio
+import sqlite3
+from datetime import datetime
 
 # <editor-fold desc="Socket Setup">
 
@@ -45,22 +47,25 @@ def accept_connections(soc: socket, lis):
 
         if lis == vid_clients:
             print("GOT VIDEO CONNECTION FROM:\n(" + str(addr[0]) + ":" + str(addr[1]) + ") " + str(cli_index) + "\n")
+            update_database(cli_index, addr[0]) # Update db
+
         if lis == aud_clients:
             print("GOT AUDIO CONNECTION FROM:\n(" + str(addr[0]) + ":" + str(addr[1]) + ") " + str(cli_index) + "\n")
 
         # print_clients()
 
-        Thread(target=send_to_client, args=(con,)).start()
+
+        Thread(target=send_to_client, args=(con, lis,)).start()
         Thread(target=receive_from_client, args=(con,)).start()
 
 
-def send_to_client(con: connection):
+def send_to_client(con: connection, lis):
     b = True
 
     while b:
-        for i in range(len(vid_clients)):
+        for i in range(len(lis)):
             try:
-                protocol4.send_frame(con.soc, con.frame, 0, i, con.index)
+                protocol4.send_frame(con.soc, lis[i].frame, 0, i, con.index)
             except ConnectionResetError:
                 b = False
 
@@ -71,6 +76,20 @@ def receive_from_client(con: connection):
             # indexes here are obsolete and passed as a null value
             con.frame, con.data, *_ = protocol4.receive_frame(con.soc, con.data)
 
+            # audio test!!!
+            FORMAT = pyaudio.paInt16
+            CHANNELS = 1
+            RATE = 44100
+            A_CHUNK = 1024
+            audio = pyaudio.PyAudio()
+
+            out_stream = audio.open(format=FORMAT, channels=CHANNELS,
+                                    rate=RATE, output=True,
+                                    frames_per_buffer=A_CHUNK)
+
+            if con in aud_clients:
+                out_stream.write(con.frame)
+
         except ConnectionResetError:
             remove_client(con, vid_clients)
             remove_client(con, aud_clients)
@@ -79,14 +98,54 @@ def receive_from_client(con: connection):
 def remove_client(con: connection, lis):
     for i in lis:
         if i.index == con.index:
-            print("removing " + str(i))
+            print("Removing Connection" + str(i.index))
             lis.remove(i)
+
+            # <editor-fold desc="SQL Update">
+
+            sq = sqlite3.connect("video_chat.db")
+            cur = sq.cursor()
+
+            now = datetime.now()
+            current_time = now.strftime("%H:%M:%S")
+
+            sql = 'UPDATE participant SET logout_time = "{}" WHERE name = {}'.format(str(current_time), i.index)
+            print (sql)
+            cur.execute(sql)
+            sq.commit()
+            res = cur.execute("SELECT * FROM participant")
+            print("*****SQL******\n", res.fetchall())
+
+            # </editor-fold>
 
             for o in range(0, len(lis)):
                 if lis[o] is None:
                     if o < len(lis) - 1:
                         lis[o].index = lis[o].index - 1
     # print_clients()
+
+
+def update_database(name, ip):
+    sq = sqlite3.connect("video_chat.db")
+    cur = sq.cursor()
+
+    res = cur.execute("SELECT name FROM sqlite_master WHERE name='participant'")
+    if res.fetchone() is None:
+        cur.execute("CREATE TABLE participant(name, ip, login_time, logout_time)")
+
+    res = cur.execute("SELECT name FROM participant")
+
+    if name not in res.fetchall():
+        now = datetime.now()
+
+        current_time = now.strftime("%H:%M:%S")
+
+        insert = """INSERT INTO participant(name, ip, login_time, logout_time) VALUES (?, ?, ?, ?);"""
+        data_tuple = (name, ip, current_time, "")
+        cur.execute(insert, data_tuple)
+        sq.commit()
+        res = cur.execute("SELECT * FROM participant")
+        print("*****SQL******\n", res.fetchall())
 
 
 def print_clients():

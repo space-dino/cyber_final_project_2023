@@ -47,6 +47,7 @@ def receive_frame(soc: socket, data: bytes):
     # return frame, data, flag, index, my_index
     return frame, data, index, my_index
 
+
 def receive_parameter(soc: socket, data, size):
     while len(data) < size:
         data += soc.recv(4 * 4096)

@@ -28,9 +28,6 @@ class client:
 
         self.host = '127.0.0.1'
         self.port = 9997
-        self.video_socket.connect((self.host, self.port))
-        self.audio_socket.connect((self.host, self.port + 1))
-        print("Connected to server")
 
         # </editor-fold>
 
@@ -82,6 +79,11 @@ class client:
         self.window.destroy()
         self.root.deiconify()  # Show the main window
         self.username_label.config(text=self.username)
+
+        self.video_socket.connect((self.host, self.port))
+        self.audio_socket.connect((self.host, self.port + 1))
+        print("Connected to server")
+
         self.start()
 
     def close_connection(self):
@@ -111,7 +113,7 @@ class client:
             vid_frame = cv2.flip(unflipped, 1)
 
             # indexes here dont matter becuase server isnt reading them. flag does matter! ********* flags obsolete
-            protocol4.send_frame(self.video_socket, vid_frame, 0, 0, 0)  # video
+            protocol4.send_frame(self.video_socket, vid_frame, 0, 0, self.username)  # video
             self.draw_GUI_frame(vid_frame, self.my_index, fps)
 
     def receive_vid(self):
@@ -145,7 +147,6 @@ class client:
 
         while self.up:
             aud_frame, self.aud_data, index, self.my_index = protocol4.receive_frame(self.audio_socket, self.aud_data)
-            print(aud_frame)
             # if bytes(aud_frame) != b'' and index != self.my_index:
             if bytes(aud_frame) != b'':
                 self.out_stream.write(aud_frame)
