@@ -9,7 +9,7 @@ import pickle
 import struct
 import numpy as np
 import lz4.frame
-
+import protocol4
 
 class Client:
     def __init__(self):
@@ -61,7 +61,7 @@ class Client:
         labels = []
         vid_data = b''
         aud_data = b''
-        my_index = 6
+        my_index = 0
         up = True
 
         return labels, vid_data, aud_data, my_index, up
@@ -76,6 +76,7 @@ class Client:
 
     def submit(self):
         self.username = self.entry.get()
+
         self.window.destroy()
         self.root.deiconify()
         self.username_label.config(text=self.username)
@@ -108,7 +109,9 @@ class Client:
             frame = cv2.flip(frame, 1)
             _, encoded_frame = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
             compressed_frame = lz4.frame.compress(encoded_frame.tobytes())
-            self.send_data(self.video_socket, compressed_frame, self.my_index)
+            protocol4.send_frame(self.video_socket, compressed_frame, 0, 0, self.my_index)
+            # self.send_data(self.video_socket, compressed_frame, self.my_index)
+
             counter += 1
             if (time.time() - start_time) >= 1:
                 fps = counter
@@ -118,8 +121,10 @@ class Client:
 
     def receive_vid(self):
         while self.up:
-            frame_data, index = self.receive_data(self.video_socket)
+            frame_data, vid_data, index, self.my_index = protocol4.receive_frame(self.video_socket, self.vid_data)
+
             if frame_data and index != self.my_index:
+            # if frame_data:
                 decompressed_frame = lz4.frame.decompress(frame_data)
                 frame = np.frombuffer(decompressed_frame, dtype=np.uint8)
                 frame = cv2.imdecode(frame, cv2.IMREAD_COLOR)
@@ -159,11 +164,14 @@ class Client:
 
     def receive_data(self, socket):
         data_size = struct.calcsize("Q")
+
         while len(self.vid_data) < data_size:
             self.vid_data += socket.recv(4096)
         packed_size = self.vid_data[:data_size]
         self.vid_data = self.vid_data[data_size:]
+
         msg_size = struct.unpack("Q", packed_size)[0]
+
         while len(self.vid_data) < msg_size:
             self.vid_data += socket.recv(4096)
         data = self.vid_data[:msg_size]

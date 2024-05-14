@@ -24,6 +24,7 @@ print("Listening video at", vid_socket_address, "audio at", aud_socket_address)
 vid_clients = []
 aud_clients = []
 
+
 class connection:
     def __init__(self, soc: socket.socket, index: int):
         self.soc = soc
@@ -31,10 +32,11 @@ class connection:
         self.data = b''
         self.index = index
 
+
 def accept_connections(soc: socket.socket, lis):
     while True:
         client_socket, addr = soc.accept()
-        cli_index = len(lis)
+        cli_index = int(str(addr[0]).replace(".", ""))
         con = connection(client_socket, cli_index)
         lis.append(con)
 
@@ -47,25 +49,38 @@ def accept_connections(soc: socket.socket, lis):
 
         Thread(target=handle_client, args=(con,)).start()
 
+
 def handle_client(con: connection):
-    while True:
-        try:
-            if con in aud_clients:
+    if con in aud_clients:
+        while True:
+            try:
                 data = con.soc.recv(1024 * 2)
                 if not data:
                     break
 
                 for i in aud_clients:
                     i.soc.sendall(data)
-            else:
+            except ConnectionResetError:
+                remove_client(con, vid_clients)
+                remove_client(con, aud_clients)
+    else:
+        while True:
+            try:
                 con.frame, con.data, *_ = protocol4.receive_frame(con.soc, con.data)
-
                 for i in vid_clients:
-                    i.soc.sendall(con.frame)
+                    ipos = get_index_pos(i)
+                    cpos = get_index_pos(con)
+                    protocol4.send_frame(i.soc, con.frame, 0, cpos, ipos)
+            except ConnectionResetError:
+                remove_client(con, vid_clients)
+                remove_client(con, aud_clients)
 
-        except ConnectionResetError:
-            remove_client(con, vid_clients)
-            remove_client(con, aud_clients)
+
+def get_index_pos(i):
+    sorted_numbers = sorted([conn.index for conn in vid_clients])
+    pos = sorted_numbers.index(i.index)
+    return pos
+
 
 def remove_client(con: connection, lis):
     for i in lis:
@@ -87,6 +102,7 @@ def remove_client(con: connection, lis):
                     if o < len(lis) - 1:
                         lis[o].index -= 1
 
+
 def update_database(name, ip):
     sq = sqlite3.connect("video_chat.db")
     cur = sq.cursor()
@@ -104,6 +120,7 @@ def update_database(name, ip):
         sq.commit()
         res = cur.execute("SELECT * FROM participant")
         print("*****SQL******\n", res.fetchall())
+
 
 Thread(target=accept_connections, args=(vid_server_socket, vid_clients,)).start()
 Thread(target=accept_connections, args=(aud_server_socket, aud_clients,)).start()
