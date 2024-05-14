@@ -45,20 +45,9 @@ def accept_connections(soc: socket.socket, lis):
         if lis == aud_clients:
             print(f"GOT AUDIO CONNECTION FROM: ({addr[0]}:{addr[1]}) {cli_index}\n")
 
-        # Thread(target=send_to_client, args=(con, lis,)).start()
-        Thread(target=receive_from_client, args=(con,)).start()
+        Thread(target=handle_client, args=(con,)).start()
 
-def send_to_client(con: connection, lis):
-    b = True
-    while b:
-        for i in range(len(lis)):
-            try:
-                if con not in aud_clients:
-                    protocol4.send_frame(con.soc, lis[i].frame, 0, i, con.index)
-            except ConnectionResetError:
-                b = False
-
-def receive_from_client(con: connection):
+def handle_client(con: connection):
     while True:
         try:
             if con in aud_clients:
