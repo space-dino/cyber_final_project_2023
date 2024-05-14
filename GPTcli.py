@@ -128,7 +128,7 @@ class Client:
                 decompressed_frame = lz4.frame.decompress(frame_data)
                 frame = np.frombuffer(decompressed_frame, dtype=np.uint8)
                 frame = cv2.imdecode(frame, cv2.IMREAD_COLOR)
-                self.draw_GUI_frame(frame, int(index))
+                self.draw_GUI_frame(frame, -1)
 
     def send_aud(self):
         while self.up:
@@ -152,7 +152,8 @@ class Client:
         self.labels[index].grid(row=index, column=0)
         self.labels[index].config(image=frame)
         self.labels[index].image = frame
-        self.index_label.config(text=f"client {index}")
+        if index != -1:
+            self.index_label.config(text=f"client {index}")
         if fps:
             self.fps_label.config(text=fps)
         self.root.update()
