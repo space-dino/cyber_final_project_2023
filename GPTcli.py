@@ -128,7 +128,7 @@ class Client:
                 decompressed_frame = lz4.frame.decompress(frame_data)
                 frame = np.frombuffer(decompressed_frame, dtype=np.uint8)
                 frame = cv2.imdecode(frame, cv2.IMREAD_COLOR)
-                self.draw_GUI_frame(frame, -1)
+                self.draw_GUI_frame(frame, index)
 
     def send_aud(self):
         while self.up:
@@ -157,28 +157,6 @@ class Client:
         if fps:
             self.fps_label.config(text=fps)
         self.root.update()
-
-    def send_data(self, socket, data, index):
-        data = pickle.dumps((index, data))
-        message = struct.pack("Q", len(data)) + data
-        socket.sendall(message)
-
-    def receive_data(self, socket):
-        data_size = struct.calcsize("Q")
-
-        while len(self.vid_data) < data_size:
-            self.vid_data += socket.recv(4096)
-        packed_size = self.vid_data[:data_size]
-        self.vid_data = self.vid_data[data_size:]
-
-        msg_size = struct.unpack("Q", packed_size)[0]
-
-        while len(self.vid_data) < msg_size:
-            self.vid_data += socket.recv(4096)
-        data = self.vid_data[:msg_size]
-        self.vid_data = self.vid_data[msg_size:]
-        index, frame_data = pickle.loads(data)
-        return frame_data, index
 
     def start_threads(self):
         Thread(target=self.send_vid).start()
